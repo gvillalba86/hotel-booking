@@ -205,7 +205,7 @@ df %>%
 ```
 
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 df %>% select_if(is.numeric) %>% describe()
 ```
 
@@ -223,7 +223,7 @@ Para la variable *adr* evidente que existen valores erróneos en los datos:
 
 En la variable *lead_time* vemos valores muy altos, pero no parece que sean erróneos, por lo que la dejamos como está.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 df <- df %>% mutate(total_nights = replace(total_nights, total_nights<1 | 
                                              total_nights>30, NA))
 df <- df %>% mutate(adr = replace(adr, adr<20 | adr>400, NA))
@@ -233,7 +233,7 @@ colSums(is.na(df))
 
 Con los valores que hemos eliminado por ser erróneos y que tenemos ahora como valor perdido, vamos a realizar una imputación por la media. En el caso de la variabble *total_nights*, al ser de tipo entero, la rendondeamos.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 df$total_nights[is.na(df$total_nights)] <- as.integer(mean(df$total_nights, na.rm=TRUE))
 df$adr[is.na(df$adr)] <- mean(df$adr, na.rm=TRUE)
 colSums(is.na(df))
@@ -314,7 +314,7 @@ df %>%
 
 Podemos ver por la gráfica que no queda del todo clara la respuesta a nuestra pregunta. Por otro lado, podemos mirar la media de coste de habitación por hotel.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 df %>% 
   group_by(is_canceled) %>% 
   summarize(adr.mean = mean(adr, na.rm = TRUE), 
@@ -334,7 +334,7 @@ Donde $\mu_1$ será la media de coste de habitación en las reservas canceladas 
 
 Antes de realizar el contraste planteado, tenemos que comprobar la igualdad de varianzas de las dos poblaciones, que estimaremos a partir de ambas.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 var.test(df$adr[df$is_canceled], df$adr[!df$is_canceled])
 ```
 
@@ -376,14 +376,14 @@ Donde $p_1$ es la proporción de cancelaciones entre reservas internacionales y 
 
 Dividimos la población entre reservas nacionales e internacionales nos quedamos con la variable que indica si la reserva ha sido cancelada.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 international <- df$is_canceled[df$is_international]
 national <- df$is_canceled[!df$is_international]
 ```
 
 Realizamos el contraste de hipótesis sobre proporciones planteado.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 prop.test(x=c(sum(international), sum(national)), 
           n=c(length(international), length(national)), 
           alternative = 'less', correct = FALSE, conf.level = 0.95)
@@ -411,7 +411,7 @@ Tomaremos como variables explicativas las siguientes:
 
 Creamos el modelo de regresión y inspeccionamos los resultados.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 model.canceled = glm(formula = is_canceled ~ hotel + arrival_date_month + 
                        is_international + total_nights + lead_time  + adr + 
                        more_than_two + with_children, 
@@ -423,7 +423,7 @@ Podemos ver como la variable categórica que indica el mes se nos ha codificado 
 
 Obtenemos los odds-ratio como la exponencial de los coeficientes de las variables explicativas obtenidos.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 round(100*exp(coefficients(model.canceled)), 2)
 ```
 
@@ -437,7 +437,7 @@ Los valores mayor de 1 indican un factor de riesgo, indicando un aumento de la p
 * Por cada día adicional en la antelación de la reserva, la probabilidad de cancelación crece un 0.67%.
 * Por cada Euro adicional de coste promedio de la noche de habitación, la probabilidad de cancelación crece un 0.8%.
 
-Realizamos dos viasualizaciones para comprobar la relación de las variables *hotel* y *more_than_two* con la probabilidad de cancelación.
+Realizamos dos visualizaciones para comprobar la relación de las variables *hotel* y *more_than_two* con la probabilidad de cancelación.
 
 ```{r, warning=FALSE,  message=FALSE, fig.height=3}
 df %>%
@@ -463,12 +463,13 @@ df %>%
 Nos planteamos si existe influencia entre el tipo de régimen de alojamiento contratado y el precio medio de la habitación.
 
 Realizamos en primer lugar un gráfico boxplot con el valor del coste de habitación por noche en función del régimen de alojamiento contratado. Nos centraremos en el caso del resort, que tiene disponibles los siguientes:
+
 * **BB**: Alojamiento y desayuno
 * **HB**: Media pensión
 * **FB**: Pensión completa
 
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 df %>%
   filter(hotel=='Resort Hotel') %>%
   filter(meal!='SC') -> df.resort
@@ -479,15 +480,15 @@ df %>%
 df.resort %>%
   ggplot(aes(x=meal, y=lead_time, fill=meal))+
   geom_boxplot()+
-  labs(x="Hotel", y="Régimen de alojamiento")+
-  ggtitle("Precio por noche de hotel")+
+  labs(x="Régimen de alojamiento", y="Coste medio por noche")+
+  ggtitle("Precio por noche de hotel en función del régimen")+
   theme(legend.position="none")
 ```
 
-El gráfico nos indica que hay evidencias de un valor de coste de habitación distinto en función del régimen contratado.Como en este caso queremos comparar la media de *adr* en función de más de dos grupos, en concreto los tres régimenes de alojamiento, realizaremos un análisis ANOVA.
+El gráfico nos indica que hay evidencias de un valor de coste de habitación distinto en función del régimen contratado. Como en este caso queremos comparar la media de *adr* en función de más de dos grupos, en concreto los tres régimenes de alojamiento, realizaremos un análisis ANOVA.
 
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 anova.adr <- aov(adr ~ meal, data=df.resort)
 summary.aov(anova.adr)
 ```
@@ -495,6 +496,7 @@ summary.aov(anova.adr)
 Los ressultados nos dan un p-valor cercano a cero, lo que indica que, efectivamente, existen diferencias significativas entre al menos dos de los tres grupos.
 
 Hay que tener en cuenta que para dar por válidos los resultados de ANOVA se tienen que cumplir dos condiciones:
+
 * Normalidad de los residuos del modelo.
 * Igualdad de varianzas de los residuos.
 
@@ -511,7 +513,7 @@ anova.fit.res %>%
 
 ```
 
-Podemos ver que los residuos no se ajustan bien a la normal, por lo que esta condición no se cumpliría. Es cierto que ANOVA es bastante resistentes a desviaciones leves de la normalidad, especialmente cuando tenemos muestras grandes, como es nuestro caso. Sin embargo, las desviaciones que vemos son bastantes grandes. Realizamos un histograma para ver la distribución de estos residuos.
+Podemos ver que los residuos no se ajustan bien a la normal, por lo que esta condición no se cumpliría. Es cierto que ANOVA es bastante resistentes a desviaciones considerables de la normalidad, especialmente cuando tenemos muestras grandes, como es nuestro caso. Sin embargo, las desviaciones que vemos son bastantes grandes. Realizamos un histograma para ver la distribución de estos residuos.
 
 ```{r, warning=FALSE,  message=FALSE, fig.height=3}
 anova.fit.res %>%
@@ -557,9 +559,9 @@ anova.fit.res2 %>%
   ggtitle("Histograma de residuos")
 ```
 
-Vemos que ahora efectivamente hemos mejorado mucho la normalidad de los datos, aunque esta no es perfecta. Sin embargo, como hemos dicho antes, ANOVA es muy resistente a pequeñas desviaciones, especialmente con muestras grandes, así que ahora podemos dar por cumplida esta condición de normalidad de residuos.
+Vemos que ahora efectivamente hemos mejorado mucho la normalidad de los datos, aunque esta no es perfecta. Sin embargo, como hemos dicho antes, ANOVA es muy resistente a moderadas desviaciones, especialmente con muestras grandes, así que ahora podemos dar por cumplida esta condición de normalidad de residuos.
 
-Evaluamos la segunda condición, que es la homocedasticidad de los residuos, realizando un gráfico de estos.
+Evaluamos la segunda condición, que es la homocedasticidad de los residuos, realizando un gráfico de éstos frente al valor ajustado.
 
 ```{r, warning=FALSE, message=FALSE, fig.height=3}
 anova.fit.res2 %>%
@@ -574,7 +576,7 @@ Vemos en la gráfica que las extensiones de las líneas de puntos son similares 
 Comprobada la idoneidad del modelo, realizamos ahora las comparaciones múltiples entre grupos teniendo en cuenta la corrección de Bonferroni, que se realiza para corregir el nivel de significación a $\frac{\epsilon}{n}$, siendo n el número de contrastes de hipótesis que hay en total. Esta correción, sin embargo, suele considerarse habitualmente como demasido conservadora.
 
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 LSD.test(anova.adr2, "meal", group=T, p.adj="bonferroni", console=T)
 ```
 
@@ -608,7 +610,7 @@ Finalmente, hemos realizado un análisis ANOVA sobre el precio medio de habitaci
 
 Exportamos los datos que hemos limpiado y sobre los que hemos realizado los análisis para tenerlos disponibles para futuros usos.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 write.csv(df, file = "../data/hotel_bookings_clean.csv", sep=",")
 ```
 
