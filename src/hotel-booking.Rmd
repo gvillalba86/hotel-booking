@@ -612,6 +612,7 @@ Exportamos los datos que hemos limpiado y sobre los que hemos realizado los aná
 write.csv(df, file = "../data/hotel_bookings_clean.csv", sep=",")
 ```
 
+Los datos exportados se encuentran también el repositorio, en la carpeta doc.
 
 
 ******
@@ -619,6 +620,9 @@ write.csv(df, file = "../data/hotel_bookings_clean.csv", sep=",")
 
 
 El código para el presente análisis se encuentra en el siguiente repositorio de GitHub:
+
+https://github.com/gvillalba86/hotel-booking
+
 
 
 ******
@@ -634,9 +638,10 @@ La contribución al trabajo de los integrantes del grupo ha sigo la siguiente:
 
 
 ******
-# Bibiliografía
+# Bibliografía
 
-Vegas, E. (2017). Preprocesamiento de datos. Material UOC.
+
+M. Calvo, D. Pérez, L. Subirats. (2019). Introducción a la limpieza y análisis de los datos. Material UOC.
 
 https://cxl.com/blog/outliers/
 
