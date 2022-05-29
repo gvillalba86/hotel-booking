@@ -1,0 +1,623 @@
+---
+title: "Tipología y ciclo de vida de los datos - Práctica 2"
+author: "Javier Guimerans Alonso, Gerson Villalba Arana"
+date: "25/05/2022"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    theme: cosmo
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+******
+
+# Descripción del dataset
+
+
+En la presente práctica se va a realizar los procesos de selección, limpieza, preparación y visualización de datos para posteriormente, en la segunda parte de la práctica (PRA2), entrenar modelos para poder obtener información útil para el área en cuestión que estemos tratando.
+
+El tema elegido para la realización de la práctica es el de optimización de procesos de reserva de noches de hotel en web especializadas. Como base para el trabajo, se parte de un dataset con información histórica sobre reservas de hoteles en dos tipos de hoteles distintos en **Portugal**. El dataset se encuentra disponible públicamente en el repositorio de Kaggle: https://www.kaggle.com/insatanic/hotel-booking-data-analysis.
+
+En base a la información proporcionada por dicho dataset, se propone un proyecto de minería de datos de clasificación, teniendo como objetivo predecir si una habitación de hotel reservada va o no a ser cancelada por parte del cliente hasta que llegue la fecha de reserva. Derivada de esta clasificación, nos podríamos plantear un segundo objetivo que sería, ya no predecir si una reserva va a ser cancelada, sino obtener una probabilidad de que esto ocurra. Por lo tanto, el proyecto resultará en un clasificador binario, donde las dos clases serán Si/No (va a ser cancelada la reserva). Sin ambargo, pomo podremos ver, de un clasificador binario podemos no sólamente podemos obtener la categoría o clase como salida, sino también la probabilidad de que se de cada una de las clases, que será lo que utilizaremos para determinar la probabilidad de que una reserva sea cancelada. Esta información puede ser valiosísima tanto para hoteles como para webs de reserva:
+
+Se tiene una visión más realista de la ocupación real que va a tener un hotel en base a las reservas actuales, lo cual puede ayudar a optimizar recursos y gastos: ¿es necesario tener productos perecederos para 500 comensales en el buffet, o es suficiente contar para 400? ¿Cuántas habitaciones van a tener que ser limpiadas?
+Se puede sobre-reservar el hotel (overbooking) en cierta medida, teniendo en cuenta que algunas de las reservas actuales se van a acabar cancelando. De esta manera se optimiza la ocupación del hotel y por lo tanto los ingresos.
+Se puede conocer el perfil de cliente que es más propenso a cancelar. De esta forma, podemos dirigir nuestro márketing al público más interesante desde el punto de vista de negocio: aquellos con menor probabilidad de cancelar una reserva.
+Se pueden buscar estrategias para evitar la cancelación de reservas sobre aquellas que detectamos con más probabilidades de ser canceladas. Podemos ofrecer incentivos para los huespedes, como cambiarle gratuitamente a una habitación superior, ofrecerles descuentos en actividades del lugar, etc.
+Toda esta información puede repercutir en miles de euros en aumento de ingresos y optimización de costes en un sólo hotel, en millones en una web de reserva con miles de hoteles que pierde una comisión cada vez que un cliente cancela una reserva.
+
+Por supuesto, el alcance de este trabajo es limitado y trataremos sólo con este dataset, pero podría ser ampliado en gran manera, añadiendo nueva información, tanto en forma de nuevas muestras (más hoteles y de otros países, para tener un modelo mejor entrenado) como de nuevas características que pudiese mejorar la capacidad predictora del modelo.
+
+
+## Carga de datos
+
+```{r, warning=FALSE,  message=FALSE}
+library(tidyverse)
+library(reshape)
+library(psych)
+library(MASS)
+library(agricolae)
+```
+
+
+```{r, warning=FALSE,  message=FALSE}
+df <- read.csv('../data/hotel_bookings_raw.csv', sep=",", na.strings=c("", "NULL"))
+str(df)
+```
+
+## Descripción de varibles
+
+
+* **hotel**. Hotel tratado. Variable categórica.
+* **is_canceled**. Especifica si la reserva a sido (1) o no (0) cancelada. Será la variable binaria objetivo de nuestro clasificador. Está especificada como entero, pero se puede convertir a booleana para optimizar espacio, ya que sólo cuenta con dos valores posibles.
+* **lead_time**. Tiempo de antelación con la que se reservó el hotel, en días. Variable numérica.
+* **arrival_date_year**. Año de comienzo de reserva. Variable numérica.
+* **arrival_date_month**. Mes de comienzo de reserva. Variable numérica.
+* **arrival_date_week_number**. Semana del año en el que comienza de reserva. Variable numérica.
+* **arrival_date_day_of_month**. Día del mes en el que comienza de reserva. Variable numérica.
+* **stays_in_weekend_nights**. Noches totales de reserva en fin de semana. Variable numérica.
+* **stays_in_week_nights**. Noches totales de reserva entre semana. Variable numérica.
+* **adults**. Número de adultos en la reserva. Variable numérica.
+* **children**. Número de niños en la reserva. Variable numérica.
+* **babies**. Número de bebés en la reserva. Variable numérica.
+* **meal**. Régimen de comidas contratado. Variable categórica.
+* **country**. País de procedencia de los clientes en formato ISO3. Variable categórica.
+* **market_segment**. Designación de segmento de mercado. Variable categórica.
+* **distribution_channel**. Canal de reserva utilizado para la reserva. Variable categórica.
+* **is_repeated_guest**. Indica si el huésped ya ha reservado en el hotel previamente. Variable categórica booleana.
+* **previous_cancellations**. Indica el número de veces que el cliente ha cancelado una reserva en el hotel. Variable numérica.
+* **previous_bookings_not_canceled**. Indica el número de veces que el cliente ha reservado y no cancelado en el hotel. Variable numérica.
+* **reserved_room_type**. Tipo de habitación reservada. Variable categórica.
+* **assigned_room_type**. Tipo de habitación asignada, que puede o no coincidir con la reservada. Variable categórica.
+* **booking_changes**. Cambios que se han realizado en la reserva desde que se realiza. Variable numérica.
+* **deposit_type**. Indica si el cliente ha realizado un depósito o no para asegurarse la reserva. Variable categórica.
+* **agent**. Identificador del agente que ha realizado la reserva. Variable categórica.
+* **company**. Identificador de la compañía que ha realizado la reserva. Variable categórica.
+* **days_in_waiting_list**. Número de días que la reserva estuvo pendiente de confirmación hacia el cliente. Variable numérica.
+* **customer_type**. Tipo de cliente. Variable categórica.
+* **adr**. Average Daily Rate. Coste promedio de la habitación por noche en la reserva. Variable numérica
+* **required_car_parking_spaces**. Número de plazas de parking reservadas. Variable numérica
+* **total_of_special_requests**. Cantidad de solicitudes especiales que ha realizado el huésped. Variable numérica
+* **reservation_status**. Estado de la reserva. Variable categórica.
+* **reservation_status_date**. Fecha de la última actualización de estado. Variable de fecha.
+
+
+
+******
+# Integración y selección
+
+Comprobamos en primer lugar el número de elementos y atributos que tenemos en el dataset.
+
+```{r, warning=FALSE,  message=FALSE}
+nrow(df)
+ncol(df)
+```
+
+
+Como disponemos de un dataset muy grande, vamos a quedarnos con un subconjunto de éste que nos permita realizar el análisis que queremos. Nos quedaremos con los siguientes atributos, ya que el resto no los utilizaremos en eneste análisis:
+
+* **hotel**
+* **is_canceled**
+* **arrival_date_month**
+* **lead_time**
+* **meal**
+* **adr**
+* **lead_time**
+
+Además, crearemos tres variables binarias nuevas para simplificar dos de las existentes:
+
+* **total_nights**, que será la suma de las variables **stays_in_weekend_nights** y **stays_in_week_nights**, y que indicará por tanto el número total de noches de reserva.
+* **is_international**, que crearemos a partir de **country**. Indicará si la reserva es internacional o no (de Portugal).
+* **more_than_two** a partir de **adults**, **children** y **babies**. Variable binaria que indicará si la reserva es para más de dos personas en total. En esta categoría se incluirán por lo tanto familias como grupos que reserven más de una habitación y familias que reserven una habitación familiar.
+* **with_children**, a partir de **children** y **babies**. Indicará si se viaja con algún niño o bebé.
+
+
+```{r, warning=FALSE,  message=FALSE}
+df$children <- as.integer(df$children)
+df$more_than_two <- (df$adults + df$children + df$babies) > 2
+df$with_children <- (df$children + df$babies) != 0
+df$is_international <- df$country != 'PRT'
+df$total_nights <- df$stays_in_weekend_nights + df$stays_in_week_nights
+df <- df %>% dplyr::select(hotel, is_canceled, arrival_date_month, lead_time, meal, adr, lead_time, total_nights, is_international, more_than_two, with_children)
+str(df)
+```
+
+
+
+******
+# Limpieza de datos
+
+
+
+## Valores nulos
+
+Comprobamos las variables que tienen valores nulos.
+
+```{r, warning=FALSE,  message=FALSE}
+colSums(is.na(df))
+```
+
+
+Además, vamos a ver los valores únicos disponibles en las variables categóricas.
+
+```{r, warning=FALSE,  message=FALSE}
+df %>% select_if(negate(is.numeric)) %>% sapply(function(x) unique(x))
+```
+
+Vemos que tenemos valores nulos en las variables *is_international*, *more_than_two* y *with_children*. Además, podemos ver que en la variables *meal* también tenemos valores nulos, esta vez bajo la categoría "Undefined", que no viene a ser más que un valor no disponible, y lo cambiamos para que se vea reflejado como NA. Teniendo en cuenta que el número de registros que tienen valores nulos es muy bajo, optamos por eliminar dichos registros del dataset.
+
+
+```{r, warning=FALSE,  message=FALSE}
+df$meal[df$meal == 'Undefined'] <- NA
+df <- df %>% drop_na(meal, is_international, more_than_two, with_children)
+colSums(is.na(df))
+```
+
+
+
+
+## Cambio de tipo
+
+Cambiamos todas las variables categóricas a tipo "factor", ya que de esta forma se trabaja de forma más eficiente con ellas, y además será requerido para utilizar ciertos modelos. Además, nos aseguramos de que "January" sea el primer factor del mes, para así asegurarnos que lo tenemos de referencia cuando se realice *one hot encoding* sobre esta variable. Además, cambiaremos la varaible *is_canceled* a tipo booleano.
+
+
+
+```{r, warning=FALSE,  message=FALSE}
+df$is_canceled <- as.logical(df$is_canceled)
+df <- df %>% mutate_if(is.character, as.factor)
+df$arrival_date_month <-relevel(df$arrival_date_month , "January")
+str(df)
+```
+
+
+
+## Detección de outliers
+
+Realizamos una representación visual de los datos numéricos con boxplot para ver visualmente los outliers que podamos tener, y obtenemos las estadísticas descriptivas básicas de éstas.
+
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+df %>%
+  select_if(is.numeric) %>%
+  melt() %>%
+  ggplot(aes(y=value, fill=variable))+
+  geom_boxplot()+
+  facet_wrap(~variable,  scales="free") +
+  labs(x="", y="")+
+  ggtitle("Distribución de variables numéricas")+
+  theme(legend.position="none", axis.text.x=element_blank(), axis.ticks.x = element_blank())
+```
+
+
+```{r}
+df %>% select_if(is.numeric) %>% describe()
+```
+
+
+Para *total_nights*, como una reserva no puede ser de ninguna noche, tomamos este valor como erróneo. Además, tomaremos como valores outliers aquellas reservas por más de un mes (30 días).
+
+
+Para la variable *adr* evidente que existen valores erróneos en los datos:
+
+* No es posible un coste medio de la habitación menor que cero.
+
+* Parece poco probable que una habitación de hotel en Portugal pueda ser reservada por menos de 20€ la noche, poniendo un límite bastante bajo. Tomaremos las muestras con un valor inferior a este como erróneas y las eliminaremos.
+
+* Parece poco probable que habitaciones se hayan reservado con un precio promedio de más de 5000€ la noche cuando el valor medio de todas las reservas es de 102€. Claramente son valores outliers que eliminaremos. Nos quedaremos sólo con los registros con un coste promedio menor o igual a 400€ la noche, que parece un límite superior razonable.
+
+
+
+```{r}
+df <- df %>% mutate(total_nights = replace(total_nights, total_nights<1 | 
+                                             total_nights>30, NA))
+df <- df %>% mutate(adr = replace(adr, adr<20 | adr>400, NA))
+colSums(is.na(df))
+```
+
+
+Con los valores que hemos eliminado por ser erróneos y que tenemos ahora como valor perdido, vamos a realizar una imputación por la media. En el caso de la variabble *total_nights*, al ser de tipo entero, la rendondeamos.
+
+```{r}
+df$total_nights[is.na(df$total_nights)] <- as.integer(mean(df$total_nights, na.rm=TRUE))
+df$adr[is.na(df$adr)] <- mean(df$adr, na.rm=TRUE)
+colSums(is.na(df))
+```
+
+Comprobamos la distribución de las variables numéricas tras la limpieza de outliers. 
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+df %>%
+  select_if(is.numeric) %>%
+  melt() %>%
+  ggplot(aes(y=value, fill=variable))+
+  geom_boxplot()+
+  facet_wrap(~variable,  scales="free") +
+  labs(x="", y="")+
+  ggtitle("Distribución de variables numéricas tras eliminar outliers")+
+  theme(legend.position="none", axis.text.x=element_blank(), 
+        axis.ticks.x = element_blank())
+```
+
+
+
+
+******
+# Análisis de datos
+
+
+## Comprobación de normalidad
+
+Para comprobar la normalidad de las variables numéricas, en primer lugar realizamos una representación en histograma de éstas.
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+df %>%
+  select_if(is.numeric) %>%
+  melt() %>%
+  ggplot(aes(value))+
+  geom_histogram(fill='skyblue4', bins=25, alpha=0.8)+
+  facet_wrap(~variable,  scale="free_x") +
+  labs(x="", y="")+
+  ggtitle("Histograma de variables numéricas")+
+  theme(legend.position="none")
+```
+
+
+A continuación realizamos la representación del gráfico QQ para evaluar normalidad.
+
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+df %>%
+  select_if(is.numeric) %>%
+  melt() %>%
+  ggplot(aes(sample = value))+
+  stat_qq(alpha=0.1)+
+  stat_qq_line(color='red', size=1)+
+  facet_wrap(~variable,  scales="free") +
+  ggtitle("QQ Plot Variables numéricas")
+```
+
+Podemos comprobar visualmente tanto por el histograma como por el gráfico QQ que ninguna de las tres variables numéricas que tenemos siguen una distribución normal. Sin embargo, hay que tener en cuenta que tenemos un número muy grande de muestras (>>30), por lo que por el teorema central del límite podremos decir que la media de cualquiera de estas tres variables seguirán una distribución normal.
+
+Además, si para angún análisis necesitáramos que las distribución de la variable fuese normal, podríamos realizar transformaciones sobre estas varaibles para normalizarlas. En principio y mientras no sea necesario, no lo haremos.
+
+
+
+
+## Análisis 1: Influencia del precio medio en la cancelación
+
+Nos planteamos la siguiente pregunta: ¿Es el precio medio de las reservas canceladas distinto al de las no canceladas?
+
+Realizamos en primer lugar con un boxplot la representación de la variable *adr* en función de si la reserva es cancelada o no.
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+df %>%
+  ggplot(aes(x=is_canceled, y=adr, fill=is_canceled))+
+  geom_boxplot()+
+  labs(x="Reserva cancelada", y="Precio por noche")+
+  ggtitle("Precio por noche de hotel en relación a la cancelación")+
+  theme(legend.position="none")
+```
+
+Podemos ver por la gráfica que no queda del todo clara la respuesta a nuestra pregunta. Por otro lado, podemos mirar la media de coste de habitación por hotel.
+
+```{r}
+df %>% 
+  group_by(is_canceled) %>% 
+  summarize(adr.mean = mean(adr, na.rm = TRUE), 
+            adr.min = min(adr, na.rm = TRUE), 
+            adr.max=max(adr, na.rm = TRUE))
+```
+
+Vemos que en la muestra que tenemos el coste medio de la noche en las reservas canceladas es algo mayor que en las no canceladas, si bien esta diferencia no es muy grande.
+
+Planteamos el contraste de hipótesis sobre las medias de la siguiente forma:
+
+$$H_0 : \mu_1 = \mu_2$$
+
+$$H_1 : \mu_1 \neq \mu_2$$
+
+Donde $\mu_1$ será la media de coste de habitación en las reservas canceladas y $\mu_2$ será la media de coste de habitación en las reservas no canceladas. Tal y como lo hemos planteado, se trata de un contraste bilateral.
+
+Antes de realizar el contraste planteado, tenemos que comprobar la igualdad de varianzas de las dos poblaciones, que estimaremos a partir de ambas.
+
+```{r}
+var.test(df$adr[df$is_canceled], df$adr[!df$is_canceled])
+```
+
+Como el p-valor nos sale muy bajo, tenemos que rechazar la hipótesis nula que implicaría una igualdad de varianzas. Por lo tanto, asumeremos ocmo cierta la hipótesis alternativa de que ambas son distintas. Con esta información ya podemos realizar el contraste planteado.
+
+```{r, warning=FALSE,  message=FALSE}
+t.test(df$adr[df$is_canceled], df$adr[!df$is_canceled], 
+       alternative='two.sided', var.equal = FALSE, conf.level = 0.95)
+```
+
+Obtenemos un p-valor muy bajo, por lo que tenemos que rechazar la hipótesis nula que asumía las medias de precio de ambos hoteles iguales. Podemos concluir, por lo tanto, que efectivamente existe una diferencia estadísticamente significativa en el precio medio de la noche entre reservas que acaban siendo canceladas y las que no.
+
+
+## Análisis 2: Influencia de procedencia de reserva sobre la cancelación
+
+Teniendo en cuenta la mayor facilidad que puede tener un viajero nacional para cancelar una reserva realizada en un hotel, nos planteamos la siguiente pregunta de investigación:
+
+¿El la proporción de reservas canceladas menor en el caso de viajeros internacionales que en el de nacionales? 
+
+
+Realizamos en primer lugar una representación visual de la proporción de reservas canceladas en reservas nacionales e internacionales.
+
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+df %>%
+  ggplot(aes(x=is_international, fill=is_canceled))+
+  geom_bar(aes(y = (..count..)/sum(..count..)))+
+  scale_y_continuous(labels=scales::percent) +
+  labs(x="Reserva internacional", y="Frecuencia relativa de cancelaciones")+
+  ggtitle("Proporción de reservas canceladas en función de la procedencia")
+```
+
+En la gráfica podemos ver una clara diferencia en la proporción de cancelaciones entre viajeros internacionales y los que no lo son. Plantemos formalmente el contrasta de hipótesis de la siguiente manera:
+
+$$H_0 : p_1 = p_2$$
+
+$$H_1 : p_1 < p_2$$
+
+Donde $p_1$ es la proporción de cancelaciones entre reservas internacionales y $p_2$ la proporción de cancelaciones en reservas nacionales.
+
+Dividimos la población entre reservas canceladas y no canceladas y nos quedamos con la variable que indica que es reserva internacional.
+
+```{r}
+international <- df$is_canceled[df$is_international]
+national <- df$is_canceled[!df$is_international]
+```
+
+Realizamos el contraste de hipótesis sobre proporciones planteado.
+
+```{r}
+prop.test(x=c(sum(international), sum(national)), 
+          n=c(length(international), length(national)), 
+          alternative = 'less', correct = FALSE, conf.level = 0.95)
+```
+
+El p-valor obtenido es muy bajo, por lo que tenemos que descartar la hipótesis nula. Por lo tanto, podemos decir que, efectivamente, la proporción de cancelaciones entre reservas internacionales es menor que entre reservas nacionales.
+
+
+
+## Análisis 3: Predicción de cancelación de reserva y factores que más influyen
+
+Si queremos predecir la variable *is_canceled*, tomaremos esta variable como variable dependiente para nuestro modelo. Hay que tener en cuenta que, al tratarse de una variable categórica, utilizaremos un modelo de regresión logística. También se podrían utilizar otros modelos de clasificación como árboles de decisión o máquinas de vector de soporte (SVM), entre otras.
+
+
+Tomaremos como variables explicativas las siguientes:
+
+* **hotel**
+* **arrival_date_month**
+* **is_international**
+* **total_nights**
+* **lead_time**
+* **adr**
+* **more_than_two**
+* **with_children**
+
+Creamos el modelo de regresión y inspeccionamos los resultados.
+
+```{r}
+model.canceled = glm(formula = is_canceled ~ hotel + arrival_date_month + 
+                       is_international + total_nights + lead_time  + adr + 
+                       more_than_two + with_children, 
+                     family=binomial(link = "logit"), data=df)
+summary(model.canceled)
+```
+
+Podemos ver como la variable categórica que indica el mes se nos ha codificado con hone hot encoding, tomando como referencia el mes de Enero. Vemos como tenemos casi todas las variables explicativas como estadísticamente significativas con un p-valor muy bajo, a excepción de la variable "April" y "December", que al tener un p-valor >0.05 no serán meses estadísticamente distintos al mes de Enero de referencia.
+
+Obtenemos los odds-ratio como la exponencial de los coeficientes de las variables explicativas obtenidos.
+
+```{r}
+exp(coefficients(model.canceled))
+```
+
+Los valores mayor de 1 indican un factor de riesgo, indicando un aumento de la probabilidad de ocurrencia de *is_canceled* (reserva cancelada) cuando este atributo aumenta (si es numérico) o aparece (si es binario). De esta forma, de los resultados podemos sacar algunos datos interesantes:
+
+* Los meses de julio, agosto y septiembre tienen un 48%, 46% y 44% menos de probabilidades de ser cancelados que el mes de referencia que es Enero.
+* Las reservas internacionales reducen la probalilidad de cancelación de la reserva en un 84%, un valor extraordinariamente alto.
+* Las reservas de más de dos personas reducen 
+
+
+
+## Análisis 4: Influencia de régimen de alojamiento sobre el precio en el resort
+
+Nos planteamos si existe influencia entre el tipo de régimen de alojamiento contratado y el precio medio de la habitación.
+
+Realizamos en primer lugar un gráfico boxplot con el valor del coste de habitación por noche en función del régimen de alojamiento contratado. Nos centraremos en el caso del resort, que tiene disponibles los siguientes:
+* **BB**: Alojamiento y desayuno
+* **HB**: Media pensión
+* **FB**: Pensión completa
+
+
+```{r}
+df %>%
+  filter(hotel=='Resort Hotel') %>%
+  filter(meal!='SC') -> df.resort
+```
+
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+df.resort %>%
+  ggplot(aes(x=meal, y=lead_time, fill=meal))+
+  geom_boxplot()+
+  labs(x="Hotel", y="Régimen de alojamiento")+
+  ggtitle("Precio por noche de hotel")+
+  theme(legend.position="none")
+```
+
+Como en este caso queremos comparar la media de *adr* en función de más de dos grupos, en concreto los tres régimenes de alojamiento, realizaremos un análisis ANOVA.
+
+
+```{r}
+anova.adr <- aov(adr ~ meal, data=df.resort)
+summary.aov(anova.adr)
+```
+
+Los ressultados nos dan un p-valor cercano a cero, lo que indica que, efectivamente, existen diferencias significativas entre alguno de los tres grupos.
+
+Hay que tener en cuenta que para dar por válidos los resultados de ANOVA se tienen que cumplir dos condiciones:
+* Normalidad de los residuos del modelo.
+* Igualdad de varianzas de los residuos.
+
+Comparamos lo primero con un gráfico QQ.
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+anova.fit.res = data.frame(fit.val=fitted.values(anova.adr), res=resid(anova.adr))
+
+anova.fit.res %>%
+  ggplot(aes(sample = res))+
+  stat_qq(alpha=0.1)+
+  stat_qq_line(color='red', size=1)+
+  ggtitle("QQ Plot Residuos")
+
+```
+
+Podemos ver que los residuos no se ajustan bien a la normal, por lo que esta condición no se cumpliría. Es cierto que ANOVA es bastante resistentes a desviaciones leves de la normalidad, especialmente cuando tenemos muestras grandes, como es nuestro caso. Sin embargo, las desviaciones que vemos son bastantes grandes. Realizamos un histograma para ver la distribución de estos residuos.
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+anova.fit.res %>%
+  ggplot(aes(x=res))+
+  geom_histogram(aes(y=..density..), bins=20, fill="steelblue4")+
+  labs(x="Residuo", y="Densidad")+
+  ggtitle("Histograma de residuos")
+```
+
+Claramente podemos ver que la distribución de los residuos no sigue una normal, ya que en primer lugar no es simétrica, y está claramente muy sesgada a la derecha. Para solucionar esto, podemos hacer una transformación sobre la variable destino, de forma que ésta se parezca más a una normal. Esto lo realizamos con una tranformación Box-Cox, donde buscaremos el valor óptimo de $\lambda$.
+
+
+```{r, warning=FALSE,  message=FALSE, fig.height=3}
+bc<-boxcox(anova.adr, lam = seq(-1, 1, 1/10))
+lambda <- bc$x[which.max(bc$y)]
+lambda
+```
+
+Con la $\lambda$ óptima calculada, realizamos un nuevo modelo ANOVA aplicando la transformación sobre la variable dependiente.
+
+```{r, warning=FALSE,  message=FALSE}
+anova.adr2 <- aov((adr^lambda-1)/lambda ~ meal, data=df.resort)
+summary.aov(anova.adr2)
+```
+
+Vemos en el resultado de ANOVA que el p-valor es muy bajo, lo que nos indica que alguna de las tres clases definidas por *meal* (regímenes de alojamiento) son estadísticamente distintas.
+
+Observamos igual que antes el gráfico QQ de los residuos y su histograma.
+
+```{r, warning=FALSE, message=FALSE, fig.height=3}
+anova.fit.res2 = data.frame(fit.val=fitted.values(anova.adr2), res=resid(anova.adr2))
+
+anova.fit.res2 %>%
+  ggplot(aes(sample = res))+
+  stat_qq(alpha=0.1)+
+  stat_qq_line(color='red', size=1)+
+  ggtitle("QQ Plot Residuos")
+
+anova.fit.res2 %>%
+  ggplot(aes(x=res))+
+  geom_histogram(aes(y=..density..), bins=20, fill="steelblue4")+
+  labs(x="Residuo", y="Densidad")+
+  ggtitle("Histograma de residuos")
+```
+
+Vemos que ahora efectivamente hemos mejorado mucho la normalidad de los datos, aunque esta no es perfecta. Sin embargo, como hemos dicho antes, ANOVA es muy resistente a pequeñas desviaciones, especialmente con muestras grandes, así que ahora podemos dar por cumplida esta condición de normalidad de residuos.
+
+Evaluamos la segunda condición, que es la homocedasticidad de los residuos, realizando un gráfico de estos.
+
+```{r, warning=FALSE, message=FALSE, fig.height=3}
+anova.fit.res2 %>%
+  ggplot(aes(x=fit.val, y=res))+
+  geom_point(alpha=0.1, color="steelblue4")+
+  labs(x="Valor ajustado", y="Residuo")+
+  ggtitle("Residuos vs. Valor ajustado")
+```
+
+Vemos en la gráfica que las extensiones de las líneas de puntos son similares en las tres clases, por lo que podemos dar por buena también la condición de igualdad de varianzas. Comprobada la idoneidad del modelo, realizamos contrastes de hipótesis dos a dos sobre las tres clases definidas por *meal* para comprobar cuáles son distintas entre ellas, ya que hasta ahora sólo sabemos que al menos dos son distintas entre sí. Utilizamos el ajuste de bonferroni.
+
+
+```{r}
+LSD.test(anova.adr2, "meal", group=T, p.adj="bonferroni", console=T)
+```
+
+El resultado que obtenemos es que los tres grupos son distintos entre ellos.
+
+
+
+
+******
+# Representación de resultados
+
+
+Las representaciones gráficas y tablas se han realizado a lo largo del documento conforme han sido necesarias.
+
+
+
+******
+# Resolución del problema
+
+
+
+
+******
+# Exportación de datos
+
+Exportamos los datos que hemos limpiado y sobre los que hemos realizado los análisis para tenerlos disponibles para futuros usos.
+
+```{r}
+write.csv(df, file = "../data/hotel_bookings_clean.csv", sep=",")
+```
+
+
+
+******
+# Código
+
+
+El código para el presente análisis se encuentra en el siguiente repositorio de GitHub:
+
+
+******
+# Contribución
+
+La contribución al trabajo de los integrantes del grupo ha sigo la siguiente:
+
+
+* **Investigación previa** Javier Guimerans Alonso, Gerson Villalba Arana
+* **Redacción de las respuestas**: Javier Guimerans Alonso, Gerson Villalba Arana
+* **Desarrollo código**: Javier Guimerans Alonso, Gerson Villalba Arana
+
+
+
+******
+# Bibiliografía
+
+Vegas, E. (2017). Preprocesamiento de datos. Material UOC.
+
+https://cxl.com/blog/outliers/
+
+https://www.statisticshowto.com/box-cox-transformation/
+
+https://statsandr.com/blog/anova-in-r/
+
+https://sites.ualberta.ca/~lkgray/uploads/7/3/6/2/7362679/slides_-_anova_assumptions.pdf
+
+https://www.cienciadedatos.net/documentos/19_anova
+
+https://arc.lib.montana.edu/book/statistics-with-r-textbook/item/56
+
+https://raymondltremblay.github.io/ANALITICA/G10_Facet_wrap.html
+
+http://www.sthda.com/english/articles/40-regression-analysis/166-predict-in-r-model-predictions-and-confidence-intervals/
+
+
+
+
